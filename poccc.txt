@@ -1,0 +1,532 @@
+'use client';
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { cn } from "@/app/lib/utils"
+import { Button } from "@/components/ui/button"
+import { IoDownload } from "react-icons/io5";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import axios from "axios";
+import DSImage from "@/components/datasourceimage"
+import _ from "lodash";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Tooltip } from "react-tooltip";
+import { commonService } from "../../common/page";
+import { BsDatabaseCheck } from "react-icons/bs";
+import { FaTableList } from "react-icons/fa6";
+ 
+type CardProps = React.ComponentProps<typeof Card>
+ 
+export function DBSources({ className, ...props }: CardProps) {
+  const router = useRouter();
+  const [sourceData, setSourceData] = useState<Record<string, string>[]>([]);
+  const [targetData, setTargetData] = useState<Record<string, string>[]>([]);
+  const [tableList, setTableList] = useState<Record<string, string>[]>([]);
+  const [targettableList, setTargetTableList] = useState<Record<string, string>[]>([]);
+  const [selectedSourceDB, setSourceDBSelected] = useState("--Select--");
+  const [selectedTargetDB, setTargetDBSelected] = useState("--Select--");
+  const [sourceSelectedTable, setSourceTableSelected] = useState("--select--");
+  const [targetSelectedTable, setTargetTableSelected] = useState("--select--");
+  const [jobstatus, setJobStatus] = useState(false);
+  const [db_tables, setDbTables] = useState<string[]>(['az_medicines', 'config_tbl', 'config_tbl1', 'config_tbl_1', 'cust', 'databricks_to_databricks', 'dp_report_tbl', 'qa_config_tbl', 'qa_report_tbl', 'qa_report_tbl1', 'pharma_drug_sales', 'saleshourly', 'salesdaily', 'salesweekly', 'salesmonthly', 'snowflake_to_databricks', 'xls_sample']);
+  const [selected_tables, setSelectedTables] = useState<string[]>([]);
+ 
+ 
+  // function saveConfig() {
+  //   const loadTypeInput = document.querySelector<HTMLInputElement>('input[name="loadType"]:checked');
+  //   if (loadTypeInput) {
+  //     const loadType = loadTypeInput.value;
+  //     const configObj = {
+  //       "config_name": "config_1",
+  //       "load_type": "Database",
+  //       "source_db_Type": selectedSourceDB,
+  //       "source_tbl": "dbo." + sourceSelectedTable,
+  //       "load": loadType,
+  //       "target_db_Type": selectedTargetDB,
+  //       "target_tbl": targetSelectedTable,
+  //       "path": null,
+  //      
+  //     }
+  //     axios.post("/api/jobs/save", configObj).then((response: any) => {
+  //       console.log(response.data.results);
+  //     });
+  //   } else {
+  //     console.log("No load type selected")
+  //   }
+  // }
+ 
+  function saveConfig() {
+    const loadTypeInput = document.querySelector<HTMLInputElement>('input[name="loadType"]:checked');
+    if (loadTypeInput) {
+      const loadType = loadTypeInput.value;
+      const configObj = {
+        "config_name": "config_1",
+        "load_type": "Database",
+        "source_db_Type": selectedSourceDB,
+        "source_tbl": "dbo." + sourceSelectedTable,
+        "load": loadType,
+        "target_db_Type": selectedTargetDB,
+        "target_tbl": targetSelectedTable,
+        "path": null,
+        "tables_db": selected_tables // Adding selected tables to configObj
+      };
+      axios.post("/api/jobs/save", configObj).then((response: any) => {
+        console.log(response.data.results);
+      });
+    } else {
+      console.log("No load type selected")
+    }
+  }
+ 
+  function handleTableSelection(selectedItems: string[]) {
+    setSelectedTables(selectedItems);
+  }
+ 
+  function setSourceTableValue(tableSelected) {
+    // alert('table value' + tableSelected);
+    setSourceTableSelected(tableSelected);
+  }
+ 
+  const onOptionChange = (value, id) => {
+    console.log(" value", value, "id", id);
+    //  alert(" selected target DB" + e.target.id);
+    setTargetDBSelected(value)
+    setTargetTableSelected(id)
+  }
+ 
+  function showPreview(selectedTable: string) {
+    window.open(`/home/tables/${selectedTable}`);
+  }
+ 
+  // async function onSourceDBSubmit(dbSelected) {
+  //   //alert(" db selected " + dbSelected);
+  //   console.log(" db selected", dbSelected);
+  //   setSourceDBSelected(dbSelected);
+  //   axios.get(`/api/get-tables/?dbSelected=${dbSelected}`).then((response: any) => {
+  //     //    console.log(response.data.results);
+  //     setTableList(response.data.results);
+  //   }).catch((error) => {
+  //     console.error(error);
+  //   });
+  //   //const targetDBResults = _.filter(sourceData, (o: Record<string, string>) => o.source_db_Type)
+  //   //setTargetData(targetDBResults);
+  //   axios.get("/api/datasources").then((response: any) => {
+  //     const results = response.data;
+  //     console.log(" fetchig data sources");
+  //     console.log(results);
+  //     const targetalldbesults = results.filter(config => String(config.source_db_Type) === dbSelected);
+  //     const targetdbesults = targetalldbesults.filter(config => String(config.target_tbl).length > 0);
+  //     setTargetData(targetdbesults);
+  //   });
+  // }
+ 
+  async function onSourceDBSubmit(dbSelected) {
+    setSourceDBSelected(dbSelected);
+    if (dbSelected === "Databricks") {
+      // If selected source DB is Databricks, set the table list to contain only the selected source DB
+      setTableList([{ TABLE_NAME: dbSelected }]);
+    } else {
+      // Otherwise, fetch the tables from the API
+      axios.get(`/api/get-tables/?dbSelected=${dbSelected}`).then((response: any) => {
+        setTableList(response.data.results);
+      }).catch((error) => {
+        console.error(error);
+      });
+    }
+    axios.get("/api/datasources").then((response: any) => {
+      const results = response.data;
+      console.log(" fetchig data sources");
+      console.log(results);
+      const targetalldbesults = results.filter(config => String(config.source_db_Type) === dbSelected);
+      const targetdbesults = targetalldbesults.filter(config => String(config.target_tbl).length > 0);
+      setTargetData(targetdbesults);
+    });
+  }
+ 
+  // not used
+  async function onTargetDBSubmit(dbSelected) {
+    setTargetDBSelected(dbSelected);
+    axios.get("/api/get-tables").then((response: any) => {
+      console.log(response.data.results);
+      setTargetTableList(response.data.results);
+    }).catch((error) => {
+      console.error(error);
+    });
+  }
+ 
+  /* this method moved to common services
+  async function transferData() {
+    const configObj = { "job_id": 421832793517678 }
+ 
+    axios.post("/api/jobs", configObj).then((response: any) => {
+      setJobStatus(response);
+      console.log("job execution")
+      console.log(response);
+      router.push("/home/jobs");
+    }).catch((error) => {
+      console.error(error);
+    });
+  }*/
+ 
+  function openConfigPreview() {
+    const loadTypeInput = document.querySelector<HTMLInputElement>('input[name="loadType"]:checked');
+    if (loadTypeInput) {
+      const loadType = loadTypeInput.value;
+      const configObj = {
+        "config_name": "config_1",
+        "load_type": "Database",
+        "source_db_Type": selectedSourceDB,
+        "source_tbl": "dbo." + sourceSelectedTable,
+        "load": loadType,
+        "target_db_Type": selectedTargetDB,
+        "target_tbl": targetSelectedTable,
+        "path": null,
+        "tables_db": selected_tables
+      };
+ 
+      const configTableHTML = `
+        <table border="1" style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <th>Config Name</th>
+            <td>${configObj.config_name}</td>
+          </tr>
+          <tr>
+            <th>Load Type</th>
+            <td>${configObj.load_type}</td>
+          </tr>
+          <tr>
+            <th>Source DB Type</th>
+            <td>${configObj.source_db_Type}</td>
+          </tr>
+          <tr>
+            <th>Source Table</th>
+            <td>${configObj.source_tbl}</td>
+          </tr>
+          <tr>
+            <th>Load</th>
+            <td>${configObj.load}</td>
+          </tr>
+          <tr>
+            <th>Target DB Type</th>
+            <td>${configObj.target_db_Type}</td>
+          </tr>
+          <tr>
+            <th>Target Table</th>
+            <td>${configObj.target_tbl}</td>
+          </tr>
+          <tr>
+            <th>Path</th>
+            <td>${configObj.path}</td>
+          </tr>
+          <tr>
+            <th>Selected Tables</th>
+            <td>${configObj.tables_db.join(', ')}</td>
+          </tr>
+        </table>
+      `;
+ 
+      const configPreviewWindow = window.open("", "Config Preview", "width=600,height=400");
+      if (configPreviewWindow) {
+        configPreviewWindow.document.write(configTableHTML);
+      }
+    } else {
+      console.log("No load type selected");
+    }
+ 
+  }
+ 
+  useEffect(() => {
+    axios.get("/api/datasources").then((response: any) => {
+      const results = response.data;
+      console.log(results);
+      const dbsrcresults = results.filter(config => String(config.load_type).toLowerCase() === 'database');
+      const uniqueSrcResults = _.uniqBy(dbsrcresults, (o: Record<string, string>) => o.source_db_Type)
+      setSourceData(uniqueSrcResults);
+    }).catch((error) => {
+      console.error(error);
+    });
+  }, [])
+ 
+  var tblName = null;
+ 
+  return (
+    <>
+      <div className="border p-4 m-1">
+        <div className="mb-2">
+          <p className="text-sm font-semibold leading-6 text-gray-900 ">
+            Source Databases
+          </p>
+        </div>
+        <div className="w-2/3 gap-2 flex flex-col " >
+          {sourceData.map((item, index) => (
+            <div key={index} className="flex flex-wrap justify-center">
+              <Card
+                className={cn(`w-full cursor-pointer ${selectedSourceDB === item.source_db_Type ? "border border-gray-700" : ""}`, className)}
+                {...props}
+                onClick={() => onSourceDBSubmit(item.source_db_Type)}
+              >
+                <CardContent className="grid gap-4 p-4 m-1">
+                  <div className=" flex justify-between ... ">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="sourceDatabase"
+                        value={item.source_db_Type}
+                        checked={selectedSourceDB === item.source_db_Type}
+                        onChange={() => onSourceDBSubmit(item.source_db_Type)}
+                        className="mr-2"
+                      />
+                      <p className="text-sm font-medium leading-none flex justify-start items-center gap-2">
+                        <DSImage dsType={item.source_db_Type} /> {item.source_db_Type}
+                      </p>
+                    </div>
+                    <div >
+                      <Button className="w-full bg-slate-500" onClick={() => onSourceDBSubmit(item.source_db_Type)}>
+                        View Tables
+                      </Button>
+                    </div>
+                  </div>
+ 
+                </CardContent>
+ 
+              </Card>
+            </div>
+          )
+          )
+          }
+ 
+          {
+            tableList.length > 0 &&
+            <div className="flex flex-wrap justify-center">
+              {(selectedSourceDB === "Databricks" || selectedSourceDB === "SQL Server" || selectedSourceDB === "Snowflake" || selectedSourceDB === "Google Big Query") && // Check if the selected source DB is Databricks, SQL Server, Snowflake, or Google BigQuery
+                <Card className={cn("w-full", className)} {...props}>
+                  <CardContent className="grid gap-4 p-4">
+                    <div className="flex justify-between ... ">
+                      <div>
+                        <p className="text-sm text-center leading-none flex justify-start items-center gap-2 ">
+                          <BsDatabaseCheck size={20} color="LeafyGreen" />
+                          {selectedSourceDB}
+                        </p>
+                      </div>
+                      <div className="grid items-center ">
+                        <div className="w-fit" data-tooltip-id="table-name">
+                          <p className="flex justify-start items-center gap-2">
+                            {/* <FaTableList size={20} /> */}
+                            {selectedSourceDB === "Databricks" && // Render Select for Databricks
+                              // <Select multiple>
+                              //   <SelectTrigger className="w-[150px]">
+                              //     <SelectValue placeholder="---Select tables---" />
+                              //   </SelectTrigger>
+                              //   <SelectContent className="w-[200px] max-h-60 overflow-y-auto">
+                              <div>
+                                <p className="text-sm font-semibold leading-6">Select Tables:</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {db_tables.map((table, index) => (
+                                    <label key={index} className="flex items-center cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        value={table}
+                                        checked={selected_tables.includes(table)}
+                                        onChange={(e) => handleTableSelection(e.target.checked ? [...selected_tables, table] : selected_tables.filter(item => item !== table))}
+                                        className="mr-2"
+                                      />
+                                      {table}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                              //   </SelectContent>
+                              // </Select>
+                            }
+                            {selectedSourceDB === "SQL Server" && // Render Checkboxes for SQL Server
+                              <div>
+                                <p className="text-sm font-semibold leading-6">Select Tables:</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {tableList.map((table, index) => (
+                                    <label key={index} className="flex items-center">
+                                      <input
+                                        type="checkbox"
+                                        value={table.TABLE_NAME}
+                                        checked={selected_tables.includes(table.TABLE_NAME)}
+                                        onChange={(e) => handleTableSelection(e.target.checked ? [...selected_tables, table.TABLE_NAME] : selected_tables.filter(item => item !== table.TABLE_NAME))}
+                                        className="mr-2"
+                                      />
+                                      {table.TABLE_NAME}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            }
+                            {selectedSourceDB === "Snowflake" && // Render Select for SQL Server
+                              <div>
+                                <p className="text-sm font-semibold leading-6">Select Tables:</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {tableList.map((table, index) => (
+                                    <label key={index} className="flex items-center">
+                                      <input
+                                        type="checkbox"
+                                        value={table.TABLE_NAME}
+                                        checked={selected_tables.includes(table.TABLE_NAME)}
+                                        onChange={(e) => handleTableSelection(e.target.checked ? [...selected_tables, table.TABLE_NAME] : selected_tables.filter(item => item !== table.TABLE_NAME))}
+                                        className="mr-2"
+                                      />
+                                      {table.TABLE_NAME}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            }
+                            {selectedSourceDB === "Google Big Query" && // Render Select for SQL Server
+                              <div>
+                                <p className="text-sm font-semibold leading-6">Select Tables:</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {tableList.map((table, index) => (
+                                    <label key={index} className="flex items-center">
+                                      <input
+                                        type="checkbox"
+                                        value={table.TABLE_NAME}
+                                        checked={selected_tables.includes(table.TABLE_NAME)}
+                                        onChange={(e) => handleTableSelection(e.target.checked ? [...selected_tables, table.TABLE_NAME] : selected_tables.filter(item => item !== table.TABLE_NAME))}
+                                        className="mr-2"
+                                      />
+                                      {table.TABLE_NAME}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            }
+                          </p>
+                        </div>
+                        <Tooltip
+                          id="table-name"
+                          content={sourceSelectedTable}
+                          place="right"
+                          className="z-50"
+                        />
+                      </div>
+                      <div >
+                        {/* <Button className="w-full bg-slate-500" onClick={() => commonService.showPreview(selectedSourceDB, sourceSelectedTable)}>
+                Preview
+              </Button> */}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              }
+            </div>
+          }
+ 
+        </div>
+      </div >
+      <div className="w-2/3 gap-2 flex flex-col px-6">
+        <Card className="w-full">
+          <CardContent className="grid gap-4 p-4 m-1">
+            <div className=" flex justify-between ... ">
+              <div className="flex-1 space-y-5">
+                <p className="flex justify-center items-center gap-2 text-sm font-semibold">
+                  <div className="flex items-center p-2">
+                    <IoDownload size={24} />
+                    <p className="text-sm font-semibold leading-6 text-gray-900 mr-4">Load Type:</p>
+                    {/* <div className="border p-3 m-8 flex"> */}
+                    <div className="flex items-center">
+                      <input type="radio" id="FULL" name="loadType" value="FULL" defaultChecked />
+                      <label htmlFor="FULL" className="ml-2">Full</label>
+                    </div>
+                    {/* <div className="flex items-center ml-4">
+                      <input type="radio" id="INCREMENTAL" name="loadType" value="INCREMENTAL" />
+                      <label htmlFor="INCREMENTAL" className="ml-2">Incremental</label>
+                    </div> */}
+                    <div className="flex items-center ml-4">
+                      <input type="radio" id="BATCH" name="loadType" value="BATCH" />
+                      <label htmlFor="BATCH" className="ml-2">Batch</label>
+                    </div>
+                    {/* </div> */}
+                  </div>
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      {
+        targetData.length > 0 &&
+ 
+        <div className="w-2/3 gap-2 flex flex-col  p-4 m-1">
+          <p className="text-sm font-semibold leading-6 text-gray-900 ">
+            Target Databases
+          </p>
+          <div className="w-full flex flex-col gap-2">
+            {
+              targetData.map((item, index) => (
+                <div key={index} className="flex flex-wrap justify-center">
+                  <Card
+                    className={cn(`w-full hover:border-gray-800 hover:shadow-md cursor-pointer`, {
+                      [selectedTargetDB === item.target_db_Type ? "border border-gray-700 selectedCard" : ""]: true
+                    })}
+                    {...props}
+                    onClick={() => onOptionChange(item.target_db_Type, item.target_tbl)}
+                  >
+                    <CardContent className="grid p-4">
+                      <div className="grid grid-cols-3 w-full justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="targetDatabase"
+                            value={item.target_db_Type}
+                            checked={selectedTargetDB === item.target_db_Type}
+                            onChange={() => onOptionChange(item.target_db_Type, item.target_tbl)}
+                            className="mr-2"
+                          />
+                          <p className="text-sm font-medium leading-none flex justify-start items-center gap-2">
+                            <DSImage dsType={item.target_db_Type} /> {item.target_db_Type}
+                          </p>
+                        </div>
+                        {/* <div className="flex justify-end items-end">
+                <input
+                  type="radio"
+                  name="previewRadio"
+                />
+              </div> */}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ))
+            }
+          </div>
+ 
+        </div>
+      }
+      < div className="flex w-2/3 justify-center ... gap-2 p-4" >
+        <div>
+          <Button className="flex justify-between bg-slate-500" onClick={() => saveConfig()}>
+            Save Config
+          </Button>
+        </div>
+        <div>
+          <Button className="flex justify-between bg-slate-500" onClick={openConfigPreview} >
+            Config Preview
+          </Button>
+        </div>
+        <div>
+          <Button className="flex justify-evenly bg-slate-500 " onClick={() => commonService.transferData(() => router.push("/home/main"))}>
+            Run
+          </Button>
+        </div>
+      </div >
+    </>
+  )
+}
+export default DBSources;
